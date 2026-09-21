@@ -8,6 +8,13 @@
       "when": 1789818641961,
       "tag": "0000_damp_namorita",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1789821169977,
+      "tag": "0001_ancient_zaladane",
+      "breakpoints": true
     }
   ]
 }

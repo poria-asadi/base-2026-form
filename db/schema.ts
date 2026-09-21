@@ -1,4 +1,4 @@
-import { integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
+import { index, integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 
 export const registrations = sqliteTable("registrations", {
   id: text("id").primaryKey(),
@@ -19,4 +19,21 @@ export const registrations = sqliteTable("registrations", {
   paymentReference: text("payment_reference"),
   createdAt: text("created_at").notNull(),
   paidAt: text("paid_at"),
-}, (table) => [uniqueIndex("idx_registrations_identifier_code").on(table.identifierCode)]);
+}, (table) => [
+  uniqueIndex("idx_registrations_identifier_code").on(table.identifierCode),
+  index("idx_registrations_created_at").on(table.createdAt),
+]);
+
+export const notificationOutbox = sqliteTable("notification_outbox", {
+  id: text("id").primaryKey(),
+  registrationId: text("registration_id").notNull(),
+  recipient: text("recipient").notNull(),
+  status: text("status").notNull().default("pending"),
+  attempts: integer("attempts").notNull().default(0),
+  lastError: text("last_error"),
+  createdAt: text("created_at").notNull(),
+  sentAt: text("sent_at"),
+}, (table) => [
+  uniqueIndex("idx_notification_registration_recipient").on(table.registrationId, table.recipient),
+  index("idx_notification_status").on(table.status),
+]);
