@@ -1,0 +1,1 @@
+export const REGISTRATION_BASE_PRICE = 399_000;

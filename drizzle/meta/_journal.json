@@ -22,6 +22,13 @@
       "when": 1789922924174,
       "tag": "0002_unique_black_tom",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1789925023047,
+      "tag": "0003_melted_the_stranger",
+      "breakpoints": true
     }
   ]
 }
