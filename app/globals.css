@@ -24,7 +24,7 @@ button,input { font:inherit; }
 .brand-panel::before { content:""; position:absolute; width:280px; height:280px; border:1px solid rgba(255,255,255,.09); border-radius:50%; left:-120px; top:170px; box-shadow:0 0 0 36px rgba(255,255,255,.025),0 0 0 72px rgba(255,255,255,.018); }
 .brand-panel::after { content:""; position:absolute; inset:auto -80px -100px auto; width:250px; height:250px; background:#f15a29; border-radius:50%; opacity:.92; }
 .brand-top,.mobile-brand { display:flex; align-items:center; gap:14px; position:relative; z-index:1; }
-.brand-logo { display:block; width:150px; height:auto; background:#fff; }
+.brand-logo { display:block; width:150px; height:auto; background:transparent; }
 .mobile-logo { width:74px; flex:0 0 auto; }
 .mobile-brand strong { display:block; font-size:17px; letter-spacing:.015em; }
 .mobile-brand span { display:block; font-size:12px; opacity:.65; margin-top:4px; }
