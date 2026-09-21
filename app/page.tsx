@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { ArrowLeft, Check, CircleCheck, CreditCard, ShieldCheck, Ticket } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { ArrowLeft, Check, CircleCheck, Clipboard, FileCheck2, Landmark, ShieldCheck, Ticket, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -10,6 +10,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
 type FormData = { fullName: string; age: string; city: string; field: string; education: string; phone: string; email: string; source: string };
 type Errors = Partial<Record<keyof FormData, string>>;
+type PaymentInfo = { configured: boolean; cardNumber: string; cardHolder: string; bankName: string };
 const initialForm: FormData = { fullName: "", age: "", city: "", field: "", education: "", phone: "", email: "", source: "" };
 const educationOptions = ["فارغ‌التحصیل", "دانشجوی دکتری", "دانشجوی کارشناسی ارشد", "دانشجوی کارشناسی"];
 const sourceOptions = ["کانال‌های تلگرامی", "لینکدین", "اینستاگرام", "دوستان و همکاران"];
@@ -56,9 +57,20 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [serverMessage, setServerMessage] = useState("");
   const [identifier, setIdentifier] = useState("");
+  const [paymentInfo, setPaymentInfo] = useState<PaymentInfo | null>(null);
+  const [receipt, setReceipt] = useState<File | null>(null);
   const basePrice = 200_000;
   const finalPrice = useMemo(() => Math.round(basePrice * (100 - discountPercent) / 100), [discountPercent]);
   const update = (key: keyof FormData, value: string) => { setForm((current) => ({ ...current, [key]: value })); setErrors((current) => ({ ...current, [key]: undefined })); };
+
+  useEffect(() => {
+    if (step !== 2 || paymentInfo) return;
+    fetch("/api/payment-info", { cache: "no-store" }).then(async (response) => {
+      const data = await response.json() as PaymentInfo & { message?: string };
+      if (!response.ok) throw new Error(data.message || "اطلاعات کارت دریافت نشد.");
+      setPaymentInfo(data);
+    }).catch((error) => setServerMessage(error instanceof Error ? error.message : "اطلاعات کارت دریافت نشد."));
+  }, [step, paymentInfo]);
 
   async function submitInfo(event: React.FormEvent) {
     event.preventDefault();
@@ -86,14 +98,19 @@ export default function Home() {
     } catch (error) { setDiscountPercent(0); setDiscountMessage(error instanceof Error ? error.message : "کد تخفیف معتبر نیست."); } finally { setLoading(false); }
   }
 
-  async function startPayment() {
+  async function uploadReceipt() {
+    if (!receipt) { setServerMessage("ابتدا تصویر یا فایل فیش واریزی را انتخاب کنید."); return; }
     setLoading(true); setServerMessage("");
     try {
-      const response = await fetch("/api/payment", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ registrationId }) });
-      const data = await response.json() as { message?: string; identifier?: string; paymentUrl?: string };
-      if (!response.ok) throw new Error(data.message || "اتصال به درگاه ممکن نشد.");
-      if (data.identifier) { setIdentifier(data.identifier); setStep(3); } else if (data.paymentUrl) window.location.assign(data.paymentUrl);
-    } catch (error) { setServerMessage(error instanceof Error ? error.message : "اتصال به درگاه ممکن نشد."); } finally { setLoading(false); }
+      const payload = new FormData();
+      payload.append("registrationId", registrationId);
+      payload.append("receipt", receipt);
+      const response = await fetch("/api/receipts", { method: "POST", body: payload });
+      const data = await response.json() as { message?: string; identifier?: string };
+      if (!response.ok) throw new Error(data.message || "آپلود فیش انجام نشد.");
+      if (!data.identifier) throw new Error("کد شناسایی دریافت نشد.");
+      setIdentifier(data.identifier); setStep(3); window.scrollTo({ top: 0, behavior: "smooth" });
+    } catch (error) { setServerMessage(error instanceof Error ? error.message : "آپلود فیش انجام نشد."); } finally { setLoading(false); }
   }
 
   const steps = ["اطلاعات", "پرداخت", "تأیید"];
@@ -110,7 +127,7 @@ export default function Home() {
           <Field label="نحوه آشنایی با ایونت" error={errors.source}><OptionGroup name="source" value={form.source} onChange={(v) => update("source", v)} options={sourceOptions} invalid={!!errors.source} /></Field>
           {serverMessage && <p className="server-error" role="alert">{serverMessage}</p>}<Button type="submit" size="lg" className="primary-action" disabled={loading}>{loading ? "در حال ثبت اطلاعات…" : <>ادامه و پرداخت <ArrowLeft /></>}</Button><p className="privacy"><ShieldCheck /> اطلاعات شما فقط برای مدیریت این رویداد استفاده می‌شود.</p>
         </form></div>}
-      {step === 2 && <div className="stage enter payment-stage"><span className="eyebrow">مرحله دوم</span><h2>تکمیل پرداخت</h2><p className="muted-copy">اطلاعات شما با موفقیت ثبت شد. پس از پرداخت، کد شناسایی اختصاصی صادر می‌شود.</p><Card className="price-card"><CardContent className="price-content"><div className="price-row"><span>هزینه ثبت‌نام</span><strong>۲۰۰٬۰۰۰ <small>تومان</small></strong></div>{discountPercent > 0 && <div className="price-row discount"><span>تخفیف</span><strong>{discountPercent}٪−</strong></div>}<div className="price-row total"><span>مبلغ نهایی</span><strong>{finalPrice.toLocaleString("fa-IR")} <small>تومان</small></strong></div></CardContent></Card><div className="discount-box"><label className="field-label" htmlFor="discount">کد تخفیف دارید؟</label><div className="discount-row"><Input id="discount" value={discountCode} onChange={(e) => setDiscountCode(e.target.value.toUpperCase())} dir="ltr" className="text-left" placeholder="DISCOUNT CODE" /><Button type="button" variant="outline" onClick={applyDiscount} disabled={loading}>اعمال کد</Button></div>{discountMessage && <p className={discountPercent ? "discount-ok" : "field-error"}>{discountMessage}</p>}</div>{serverMessage && <p className="server-error" role="alert">{serverMessage}</p>}<Button size="lg" className="primary-action" onClick={startPayment} disabled={loading}>{loading ? "در حال اتصال…" : <><CreditCard /> پرداخت {finalPrice.toLocaleString("fa-IR")} تومان</>}</Button><button className="back-button" onClick={() => setStep(1)}>بازگشت و ویرایش اطلاعات</button></div>}
-      {step === 3 && <div className="stage enter success-stage"><div className="success-icon"><CircleCheck /></div><span className="eyebrow">ثبت‌نام تکمیل شد</span><h2>{form.fullName}، منتظرتان هستیم.</h2><p className="muted-copy">پرداخت شما تأیید شد و ثبت‌نام در BASE 2026 با موفقیت انجام گرفت.</p><div className="id-ticket"><span>کد شناسایی اختصاصی شما</span><strong dir="ltr">{identifier || "— — — — —"}</strong><div className="ticket-cut left" /><div className="ticket-cut right" /></div><div className="important-note"><Check /><p>لطفاً کد شناسایی مخصوص خود را تا روز برگزاری ایونت به خاطر داشته باشید. همراه داشتن این کد برای ورود به ایونت و پرسش سؤال از میهمانان الزامی است.</p></div><p className="code-link-note">این کد به نام و اطلاعات ثبت‌نامی شما متصل است و بعداً در بات تلگرام رویداد برای پرسیدن سؤال از میهمان‌ها استفاده خواهد شد.</p></div>}
+      {step === 2 && <div className="stage enter payment-stage"><span className="eyebrow">مرحله دوم</span><h2>پرداخت کارت‌به‌کارت</h2><p className="muted-copy">مبلغ نهایی را به کارت زیر واریز کنید و سپس تصویر یا فایل فیش را بارگذاری کنید.</p><Card className="price-card"><CardContent className="price-content"><div className="price-row"><span>هزینه ثبت‌نام</span><strong>۲۰۰٬۰۰۰ <small>تومان</small></strong></div>{discountPercent > 0 && <div className="price-row discount"><span>تخفیف</span><strong>{discountPercent}٪−</strong></div>}<div className="price-row total"><span>مبلغ نهایی</span><strong>{finalPrice.toLocaleString("fa-IR")} <small>تومان</small></strong></div></CardContent></Card><div className="discount-box"><label className="field-label" htmlFor="discount">کد تخفیف دارید؟</label><div className="discount-row"><Input id="discount" value={discountCode} onChange={(e) => setDiscountCode(e.target.value.toUpperCase())} dir="ltr" className="text-left" placeholder="DISCOUNT CODE" /><Button type="button" variant="outline" onClick={applyDiscount} disabled={loading}>اعمال کد</Button></div>{discountMessage && <p className={discountPercent ? "discount-ok" : "field-error"}>{discountMessage}</p>}</div><div className={`card-transfer ${paymentInfo?.configured ? "configured" : "unconfigured"}`}><Landmark /><div><span>شماره کارت مقصد</span><strong dir="ltr">{paymentInfo?.configured ? paymentInfo.cardNumber : "هنوز تنظیم نشده"}</strong>{paymentInfo?.configured && <p>{paymentInfo.cardHolder}{paymentInfo.bankName ? ` · ${paymentInfo.bankName}` : ""}</p>}</div>{paymentInfo?.configured && <button type="button" aria-label="کپی شماره کارت" onClick={() => navigator.clipboard.writeText(paymentInfo.cardNumber)}><Clipboard /></button>}</div>{paymentInfo && !paymentInfo.configured && <p className="setup-warning">اطلاعات کارت مقصد هنوز توسط برگزارکننده تنظیم نشده است. بارگذاری فیش پس از تکمیل این اطلاعات فعال می‌شود.</p>}<label className={`receipt-upload ${receipt ? "has-file" : ""}`}><input type="file" accept="image/jpeg,image/png,application/pdf" onChange={(event) => { const file = event.target.files?.[0] ?? null; setReceipt(file); setServerMessage(file && file.size > 8 * 1024 * 1024 ? "حجم فایل باید حداکثر ۸ مگابایت باشد." : ""); }} disabled={!paymentInfo?.configured || loading} /><span className="upload-icon">{receipt ? <FileCheck2 /> : <Upload />}</span><strong>{receipt ? receipt.name : "تصویر یا فایل فیش را انتخاب کنید"}</strong><small>JPG، PNG یا PDF · حداکثر ۸ مگابایت</small></label>{serverMessage && <p className="server-error" role="alert">{serverMessage}</p>}<Button size="lg" className="primary-action" onClick={uploadReceipt} disabled={loading || !paymentInfo?.configured || !receipt || receipt.size > 8 * 1024 * 1024}>{loading ? "در حال بارگذاری فیش…" : <><Upload /> ثبت فیش و تکمیل ثبت‌نام</>}</Button><button className="back-button" onClick={() => setStep(1)}>بازگشت و ویرایش اطلاعات</button></div>}
+      {step === 3 && <div className="stage enter success-stage"><div className="success-icon"><CircleCheck /></div><span className="eyebrow">ثبت‌نام تکمیل شد</span><h2>{form.fullName} عزیز، ثبت‌نام شما در ایونت BASE-2026 با موفقیت انجام شد.</h2><p className="muted-copy">فیش واریزی شما با موفقیت دریافت شد.</p><div className="id-ticket"><span>کد شناسایی اختصاصی شما</span><strong dir="ltr">{identifier || "— — — — —"}</strong><div className="ticket-cut left" /><div className="ticket-cut right" /></div><div className="important-note"><Check /><p>لطفاً کد شناسایی مخصوص خود را تا روز برگزاری ایونت به خاطر داشته باشید. همراه داشتن این کد برای ورود به ایونت و پرسش سؤال از میهمانان الزامی است.</p></div><p className="code-link-note">این کد به نام و اطلاعات ثبت‌نامی شما متصل است و بعداً در بات تلگرام رویداد برای پرسیدن سؤال از میهمان‌ها استفاده خواهد شد.</p></div>}
     </section></div></main>;
 }

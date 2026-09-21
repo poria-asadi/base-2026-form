@@ -7,7 +7,7 @@ export async function GET() {
   const user = await getChatGPTUser();
   const adminEmail = env.ADMIN_EMAIL?.trim().toLowerCase();
   if (!user || !adminEmail || user.email.trim().toLowerCase() !== adminEmail) return new Response("Forbidden", { status: 403 });
-  const result = await getD1().prepare(`SELECT id, full_name, age, city, field, education, phone, email, source, status, base_amount, discount_code, discount_percent, final_amount, identifier_code, payment_reference, created_at, paid_at FROM registrations ORDER BY created_at DESC`).all<RegistrationExportRow>();
+  const result = await getD1().prepare(`SELECT registrations.id, registrations.full_name, registrations.age, registrations.city, registrations.field, registrations.education, registrations.phone, registrations.email, registrations.source, registrations.status, registrations.base_amount, registrations.discount_code, registrations.discount_percent, registrations.final_amount, registrations.identifier_code, registrations.payment_reference, registrations.created_at, registrations.paid_at, payment_receipts.original_name AS receipt_name, payment_receipts.created_at AS receipt_submitted_at FROM registrations LEFT JOIN payment_receipts ON payment_receipts.registration_id = registrations.id ORDER BY registrations.created_at DESC`).all<RegistrationExportRow>();
   const xml = createRegistrationsExcel(result.results);
   return new Response(xml, {
     headers: {

@@ -15,6 +15,13 @@
       "when": 1789821169977,
       "tag": "0001_ancient_zaladane",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1789922924174,
+      "tag": "0002_unique_black_tom",
+      "breakpoints": true
     }
   ]
 }

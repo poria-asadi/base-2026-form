@@ -16,7 +16,7 @@ type D1Like = {
 
 const escapeHtml = (value: unknown) => String(value ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
 
-export async function queueAndSendRegistrationNotice(db: D1Like, registration: RegistrationNotice) {
+export async function queueAndSendRegistrationNotice(db: D1Like, registration: RegistrationNotice, kind: "paid" | "receipt_submitted" = "paid") {
   const recipient = env.REGISTRATION_NOTIFICATION_TO?.trim();
   if (!recipient) return;
   const outboxId = crypto.randomUUID();
@@ -35,8 +35,8 @@ export async function queueAndSendRegistrationNotice(db: D1Like, registration: R
       body: JSON.stringify({
         from: env.REGISTRATION_FROM_EMAIL,
         to: [recipient],
-        subject: `ثبت‌نام قطعی جدید BASE 2026 — ${registration.full_name}`,
-        html: `<div dir="rtl" style="font-family:Arial,sans-serif;line-height:1.9"><h2>یک ثبت‌نام قطعی جدید انجام شد</h2><p><strong>نام:</strong> ${escapeHtml(registration.full_name)}</p><p><strong>کد شناسایی:</strong> ${escapeHtml(registration.identifier_code)}</p><p><strong>شماره تماس:</strong> ${escapeHtml(registration.phone)}</p><p><strong>ایمیل:</strong> ${escapeHtml(registration.email)}</p><p><strong>شهر:</strong> ${escapeHtml(registration.city)}</p><p><strong>مبلغ پرداختی:</strong> ${registration.final_amount.toLocaleString("fa-IR")} تومان</p></div>`,
+        subject: `${kind === "receipt_submitted" ? "فیش واریزی جدید" : "ثبت‌نام قطعی جدید"} BASE 2026 — ${registration.full_name}`,
+        html: `<div dir="rtl" style="font-family:Arial,sans-serif;line-height:1.9"><h2>${kind === "receipt_submitted" ? "یک فیش واریزی جدید ثبت شد" : "یک ثبت‌نام قطعی جدید انجام شد"}</h2><p><strong>نام:</strong> ${escapeHtml(registration.full_name)}</p><p><strong>کد شناسایی:</strong> ${escapeHtml(registration.identifier_code)}</p><p><strong>شماره تماس:</strong> ${escapeHtml(registration.phone)}</p><p><strong>ایمیل:</strong> ${escapeHtml(registration.email)}</p><p><strong>شهر:</strong> ${escapeHtml(registration.city)}</p><p><strong>مبلغ اعلام‌شده:</strong> ${registration.final_amount.toLocaleString("fa-IR")} تومان</p></div>`,
       }),
     });
     if (!response.ok) throw new Error(`Resend returned ${response.status}`);

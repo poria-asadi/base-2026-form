@@ -22,6 +22,21 @@ export const registrations = sqliteTable("registrations", {
 }, (table) => [
   uniqueIndex("idx_registrations_identifier_code").on(table.identifierCode),
   index("idx_registrations_created_at").on(table.createdAt),
+  index("idx_registrations_status").on(table.status),
+]);
+
+export const paymentReceipts = sqliteTable("payment_receipts", {
+  id: text("id").primaryKey(),
+  registrationId: text("registration_id").notNull(),
+  objectKey: text("object_key").notNull(),
+  originalName: text("original_name").notNull(),
+  contentType: text("content_type").notNull(),
+  sizeBytes: integer("size_bytes").notNull(),
+  createdAt: text("created_at").notNull(),
+}, (table) => [
+  uniqueIndex("idx_payment_receipts_registration").on(table.registrationId),
+  uniqueIndex("idx_payment_receipts_object_key").on(table.objectKey),
+  index("idx_payment_receipts_created_at").on(table.createdAt),
 ]);
 
 export const notificationOutbox = sqliteTable("notification_outbox", {

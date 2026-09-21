@@ -6,5 +6,8 @@ declare namespace Cloudflare {
     REGISTRATION_NOTIFICATION_TO?: string;
     RESEND_API_KEY?: string;
     REGISTRATION_FROM_EMAIL?: string;
+    PAYMENT_CARD_NUMBER?: string;
+    PAYMENT_CARD_HOLDER?: string;
+    PAYMENT_BANK_NAME?: string;
   }
 }
