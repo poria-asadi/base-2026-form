@@ -3,6 +3,7 @@ import { Download, LockKeyhole } from "lucide-react";
 import { requireChatGPTUser } from "@/app/chatgpt-auth";
 import { buttonVariants } from "@/components/ui/button";
 import { getD1 } from "@/lib/d1";
+import { isAdminEmail } from "@/lib/admin-access";
 
 export const dynamic = "force-dynamic";
 type Summary = { total: number; submitted: number; pending: number };
@@ -10,8 +11,8 @@ type RecentRow = { id: string; full_name: string; phone: string; status: string;
 
 export default async function AdminPage() {
   const user = await requireChatGPTUser("/admin");
-  const allowed = Boolean(env.ADMIN_EMAIL && user.email.trim().toLowerCase() === env.ADMIN_EMAIL.trim().toLowerCase());
-  if (!allowed) return <main className="admin-page"><div className="admin-shell admin-card admin-denied"><LockKeyhole size={38} /><h1>دسترسی مجاز نیست</h1><p>این بخش فقط برای مدیر ثبت‌نام رویداد در دسترس است.</p></div></main>;
+  const allowed = isAdminEmail(user.email);
+  if (!allowed) return <main className="admin-page"><div className="admin-shell admin-card admin-denied"><LockKeyhole size={38} /><h1>دسترسی مجاز نیست</h1><p>این بخش فقط برای مدیر ثبت‌نام رویداد در دسترس است.</p><p>حساب فعلی: <span dir="ltr">{user.email}</span></p></div></main>;
   const db = getD1();
   const summary = await db.prepare(`SELECT COUNT(*) AS total, SUM(CASE WHEN status IN ('receipt_submitted', 'paid') THEN 1 ELSE 0 END) AS submitted, SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) AS pending FROM registrations`).first<Summary>();
   const recent = await db.prepare(`SELECT registrations.id, registrations.full_name, registrations.phone, registrations.status, registrations.final_amount, registrations.identifier_code, registrations.created_at, payment_receipts.original_name AS receipt_name FROM registrations LEFT JOIN payment_receipts ON payment_receipts.registration_id = registrations.id ORDER BY registrations.created_at DESC LIMIT 10`).all<RecentRow>();
