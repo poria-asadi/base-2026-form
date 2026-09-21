@@ -1,0 +1,116 @@
+"use client";
+
+import { useMemo, useState } from "react";
+import { ArrowLeft, Check, CircleCheck, CreditCard, ShieldCheck, Ticket } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Progress } from "@/components/ui/progress";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+
+type FormData = { fullName: string; age: string; city: string; field: string; education: string; phone: string; email: string; source: string };
+type Errors = Partial<Record<keyof FormData, string>>;
+const initialForm: FormData = { fullName: "", age: "", city: "", field: "", education: "", phone: "", email: "", source: "" };
+const educationOptions = ["فارغ‌التحصیل", "دانشجوی دکتری", "دانشجوی کارشناسی ارشد", "دانشجوی کارشناسی"];
+const sourceOptions = ["کانال‌های تلگرامی", "لینکدین", "اینستاگرام", "دوستان و همکاران"];
+const faToEn = (value: string) => value.replace(/[۰-۹]/g, (char) => String("۰۱۲۳۴۵۶۷۸۹".indexOf(char))).replace(/[٠-٩]/g, (char) => String("٠١٢٣٤٥٦٧٨٩".indexOf(char)));
+const normalizePhone = (value: string) => {
+  const clean = faToEn(value).replace(/[\s()-]/g, "");
+  if (clean.startsWith("+98")) return `0${clean.slice(3)}`;
+  if (clean.startsWith("0098")) return `0${clean.slice(4)}`;
+  return clean;
+};
+
+function validate(values: FormData): Errors {
+  const errors: Errors = {};
+  const persianText = /^[\u0600-\u06FF\u200c\s\-]+$/u;
+  const fullName = values.fullName.trim().replace(/\s+/g, " ");
+  if (fullName.length < 5 || fullName.split(" ").length < 2 || !persianText.test(fullName)) errors.fullName = "نام و نام خانوادگی را کامل و با حروف فارسی وارد کنید.";
+  const age = Number(faToEn(values.age));
+  if (!Number.isInteger(age) || age < 12 || age > 100) errors.age = "سن را به‌صورت عددی بین ۱۲ تا ۱۰۰ وارد کنید.";
+  if (values.city.trim().length < 2 || !persianText.test(values.city.trim())) errors.city = "نام شهر را با حروف فارسی وارد کنید.";
+  if (values.field.trim().length < 2) errors.field = "رشته تحصیلی یا حوزه کاری را کامل‌تر بنویسید.";
+  if (!educationOptions.includes(values.education)) errors.education = "یکی از گزینه‌ها را انتخاب کنید.";
+  if (!/^09\d{9}$/.test(normalizePhone(values.phone))) errors.phone = "شماره موبایل معتبر وارد کنید؛ مثال: ۰۹۱۲۱۲۳۴۵۶۷";
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/i.test(values.email.trim())) errors.email = "ساختار ایمیل صحیح نیست؛ مثال: name@example.com";
+  if (!sourceOptions.includes(values.source)) errors.source = "یکی از گزینه‌ها را انتخاب کنید.";
+  return errors;
+}
+
+function Field({ label, error, hint, children }: { label: string; error?: string; hint?: string; children: React.ReactNode }) {
+  return <div className="field-wrap"><label className="field-label">{label}</label>{children}{error ? <p className="field-error" role="alert">{error}</p> : hint ? <p className="field-hint">{hint}</p> : null}</div>;
+}
+
+function OptionGroup({ value, onChange, options, name, invalid }: { value: string; onChange: (value: string) => void; options: string[]; name: string; invalid?: boolean }) {
+  return <RadioGroup dir="rtl" value={value} onValueChange={onChange} aria-invalid={invalid} className="option-grid">{options.map((option) => <label className={`option-card ${value === option ? "selected" : ""}`} key={option}><RadioGroupItem value={option} id={`${name}-${option}`} /><span>{option}</span></label>)}</RadioGroup>;
+}
+
+export default function Home() {
+  const [step, setStep] = useState(1);
+  const [form, setForm] = useState<FormData>(initialForm);
+  const [errors, setErrors] = useState<Errors>({});
+  const [registrationId, setRegistrationId] = useState("");
+  const [discountCode, setDiscountCode] = useState("");
+  const [discountPercent, setDiscountPercent] = useState(0);
+  const [discountMessage, setDiscountMessage] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [serverMessage, setServerMessage] = useState("");
+  const [identifier, setIdentifier] = useState("");
+  const basePrice = 200_000;
+  const finalPrice = useMemo(() => Math.round(basePrice * (100 - discountPercent) / 100), [discountPercent]);
+  const update = (key: keyof FormData, value: string) => { setForm((current) => ({ ...current, [key]: value })); setErrors((current) => ({ ...current, [key]: undefined })); };
+
+  async function submitInfo(event: React.FormEvent) {
+    event.preventDefault();
+    const nextErrors = validate(form);
+    if (Object.keys(nextErrors).length) { setErrors(nextErrors); setTimeout(() => document.querySelector("[aria-invalid='true']")?.scrollIntoView({ behavior: "smooth", block: "center" }), 0); return; }
+    setLoading(true); setServerMessage("");
+    try {
+      const response = await fetch("/api/registrations", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ...form, age: Number(faToEn(form.age)), phone: normalizePhone(form.phone) }) });
+      const data = await response.json() as { message?: string; registrationId?: string };
+      if (!response.ok) throw new Error(data.message || "ثبت اطلاعات انجام نشد.");
+      if (!data.registrationId) throw new Error("شناسه ثبت‌نام دریافت نشد.");
+      setRegistrationId(data.registrationId); setStep(2); window.scrollTo({ top: 0, behavior: "smooth" });
+    } catch (error) { setServerMessage(error instanceof Error ? error.message : "خطایی رخ داد. دوباره تلاش کنید."); } finally { setLoading(false); }
+  }
+
+  async function applyDiscount() {
+    if (!discountCode.trim()) { setDiscountMessage("ابتدا کد تخفیف را وارد کنید."); return; }
+    setLoading(true); setDiscountMessage("");
+    try {
+      const response = await fetch("/api/discount", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ registrationId, code: discountCode.trim() }) });
+      const data = await response.json() as { message?: string; percent?: number; finalAmount?: number };
+      if (!response.ok) throw new Error(data.message || "کد تخفیف معتبر نیست.");
+      if (typeof data.percent !== "number") throw new Error("پاسخ کد تخفیف معتبر نیست.");
+      setDiscountPercent(data.percent); setDiscountMessage(`کد تخفیف اعمال شد: ${data.percent}٪ تخفیف`);
+    } catch (error) { setDiscountPercent(0); setDiscountMessage(error instanceof Error ? error.message : "کد تخفیف معتبر نیست."); } finally { setLoading(false); }
+  }
+
+  async function startPayment() {
+    setLoading(true); setServerMessage("");
+    try {
+      const response = await fetch("/api/payment", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ registrationId }) });
+      const data = await response.json() as { message?: string; identifier?: string; paymentUrl?: string };
+      if (!response.ok) throw new Error(data.message || "اتصال به درگاه ممکن نشد.");
+      if (data.identifier) { setIdentifier(data.identifier); setStep(3); } else if (data.paymentUrl) window.location.assign(data.paymentUrl);
+    } catch (error) { setServerMessage(error instanceof Error ? error.message : "اتصال به درگاه ممکن نشد."); } finally { setLoading(false); }
+  }
+
+  const steps = ["اطلاعات", "پرداخت", "تأیید"];
+  return <main className="page-shell" dir="rtl"><div className="ambient ambient-one" /><div className="ambient ambient-two" /><div className="layout">
+    <aside className="brand-panel"><div className="brand-top"><img className="brand-logo" src="/brand/banyan-innovation-center-logo.jpg" alt="لوگوی مرکز نوآوری بانیان" /></div><div className="event-lockup" lang="en"><span className="edition">FIRST EDITION · 2026</span><h1><b>BASE</b><em>2026</em></h1><p>Banyan Accelerator<br />& Startup Event</p></div><div className="brand-note"><Ticket /><span>فرم رسمی ثبت‌نام<br /><b>اولین رویداد بانیان</b></span></div><div className="perforation" aria-hidden="true" /></aside>
+    <section className="form-panel"><header className="mobile-brand"><img className="brand-logo mobile-logo" src="/brand/banyan-innovation-center-logo.jpg" alt="لوگوی مرکز نوآوری بانیان" /><div><strong lang="en">BASE 2026</strong><span>مرکز نوآوری بانیان</span></div></header>
+      <div className="stepper" aria-label="مراحل ثبت‌نام"><div className="step-labels">{steps.map((item, index) => <span key={item} className={step >= index + 1 ? "active" : ""}>{index + 1}. {item}</span>)}</div><Progress value={step * 33.33} className="progress" /></div>
+      {step === 1 && <div className="stage enter"><div className="intro"><span className="eyebrow">ثبت‌نام رویداد</span><h2>به اولین ایونت مرکز نوآوری بانیان خوش آمدید.</h2><p>در این ایونت در خدمت میهمان‌های بزرگی از صنعت استارت‌آپ ایران هستیم و قصد داریم ضمن استفاده از تجربه‌ی این میهمانان گرانقدر، با مسیر ساخت یک استارت‌آپ آشنا شویم.</p><p>خواهشمندیم برای ثبت‌نام در رویداد BASE-2026 اطلاعات مورد نیاز را با دقت تکمیل فرمایید.</p></div>
+        <form onSubmit={submitInfo} noValidate className="registration-form">
+          <div className="two-col"><Field label="نام و نام خانوادگی" error={errors.fullName}><Input value={form.fullName} onChange={(e) => update("fullName", e.target.value)} aria-invalid={!!errors.fullName} autoComplete="name" placeholder="مثال: سارا احمدی" /></Field><Field label="سن" error={errors.age} hint="سن را به سال وارد کنید؛ مثال: ۳۶"><Input value={form.age} onChange={(e) => update("age", e.target.value)} aria-invalid={!!errors.age} inputMode="numeric" placeholder="۳۶" /></Field></div>
+          <div className="two-col"><Field label="شهر محل اقامت" error={errors.city}><Input value={form.city} onChange={(e) => update("city", e.target.value)} aria-invalid={!!errors.city} autoComplete="address-level2" placeholder="مثال: تهران" /></Field><Field label="رشته تحصیلی یا حوزه کاری" error={errors.field}><Input value={form.field} onChange={(e) => update("field", e.target.value)} aria-invalid={!!errors.field} placeholder="مثال: طراحی محصول" /></Field></div>
+          <Field label="مقطع تحصیلی" error={errors.education}><OptionGroup name="education" value={form.education} onChange={(v) => update("education", v)} options={educationOptions} invalid={!!errors.education} /></Field>
+          <div className="two-col"><Field label="شماره تماس" error={errors.phone} hint="شماره موبایل ایران؛ مثال: ۰۹۱۲۱۲۳۴۵۶۷"><Input value={form.phone} onChange={(e) => update("phone", e.target.value)} aria-invalid={!!errors.phone} inputMode="tel" autoComplete="tel" dir="ltr" className="text-right" placeholder="09121234567" /></Field><Field label="آدرس ایمیل" error={errors.email}><Input value={form.email} onChange={(e) => update("email", e.target.value)} aria-invalid={!!errors.email} type="email" autoComplete="email" dir="ltr" className="text-left" placeholder="name@example.com" /></Field></div>
+          <Field label="نحوه آشنایی با ایونت" error={errors.source}><OptionGroup name="source" value={form.source} onChange={(v) => update("source", v)} options={sourceOptions} invalid={!!errors.source} /></Field>
+          {serverMessage && <p className="server-error" role="alert">{serverMessage}</p>}<Button type="submit" size="lg" className="primary-action" disabled={loading}>{loading ? "در حال ثبت اطلاعات…" : <>ادامه و پرداخت <ArrowLeft /></>}</Button><p className="privacy"><ShieldCheck /> اطلاعات شما فقط برای مدیریت این رویداد استفاده می‌شود.</p>
+        </form></div>}
+      {step === 2 && <div className="stage enter payment-stage"><span className="eyebrow">مرحله دوم</span><h2>تکمیل پرداخت</h2><p className="muted-copy">اطلاعات شما با موفقیت ثبت شد. پس از پرداخت، کد شناسایی اختصاصی صادر می‌شود.</p><Card className="price-card"><CardContent className="price-content"><div className="price-row"><span>هزینه ثبت‌نام</span><strong>۲۰۰٬۰۰۰ <small>تومان</small></strong></div>{discountPercent > 0 && <div className="price-row discount"><span>تخفیف</span><strong>{discountPercent}٪−</strong></div>}<div className="price-row total"><span>مبلغ نهایی</span><strong>{finalPrice.toLocaleString("fa-IR")} <small>تومان</small></strong></div></CardContent></Card><div className="discount-box"><label className="field-label" htmlFor="discount">کد تخفیف دارید؟</label><div className="discount-row"><Input id="discount" value={discountCode} onChange={(e) => setDiscountCode(e.target.value.toUpperCase())} dir="ltr" className="text-left" placeholder="DISCOUNT CODE" /><Button type="button" variant="outline" onClick={applyDiscount} disabled={loading}>اعمال کد</Button></div>{discountMessage && <p className={discountPercent ? "discount-ok" : "field-error"}>{discountMessage}</p>}</div>{serverMessage && <p className="server-error" role="alert">{serverMessage}</p>}<Button size="lg" className="primary-action" onClick={startPayment} disabled={loading}>{loading ? "در حال اتصال…" : <><CreditCard /> پرداخت {finalPrice.toLocaleString("fa-IR")} تومان</>}</Button><button className="back-button" onClick={() => setStep(1)}>بازگشت و ویرایش اطلاعات</button></div>}
+      {step === 3 && <div className="stage enter success-stage"><div className="success-icon"><CircleCheck /></div><span className="eyebrow">ثبت‌نام تکمیل شد</span><h2>{form.fullName}، منتظرتان هستیم.</h2><p className="muted-copy">پرداخت شما تأیید شد و ثبت‌نام در BASE 2026 با موفقیت انجام گرفت.</p><div className="id-ticket"><span>کد شناسایی اختصاصی شما</span><strong dir="ltr">{identifier || "— — — — —"}</strong><div className="ticket-cut left" /><div className="ticket-cut right" /></div><div className="important-note"><Check /><p>لطفاً کد شناسایی مخصوص خود را تا روز برگزاری ایونت به خاطر داشته باشید. همراه داشتن این کد برای ورود به ایونت و پرسش سؤال از میهمانان الزامی است.</p></div><p className="code-link-note">این کد به نام و اطلاعات ثبت‌نامی شما متصل است و بعداً در بات تلگرام رویداد برای پرسیدن سؤال از میهمان‌ها استفاده خواهد شد.</p></div>}
+    </section></div></main>;
+}
