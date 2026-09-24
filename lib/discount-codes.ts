@@ -6,6 +6,7 @@ export const discountCodes: DiscountCode[] = [
   { code: "COTAR-MEMBER", percent: 70, active: true },
   { code: "COTAR-EXECUTIVE", percent: 100, active: true },
   { code: "SPECIAL-GUEST", percent: 100, active: true },
+  { code: "BANYANAI-GUEST", percent: 70, active: true },
 ];
 
 const normalizeDiscountCode = (value: string) => value
