@@ -1,8 +1,6 @@
 import { getD1 } from "@/lib/d1";
 import { ADMIN_COOKIE_NAME, readCookie, verifyAdminSessionToken } from "@/lib/admin-auth";
 
-const allowedStatuses = new Set(["approved", "rejected"]);
-
 function externalOrigin(request: Request): string {
   const proto = request.headers.get("x-forwarded-proto") ?? new URL(request.url).protocol.replace(":", "");
   const host = request.headers.get("host") ?? new URL(request.url).host;
@@ -18,19 +16,13 @@ export async function POST(request: Request) {
 
   const formData = await request.formData();
   const registrationId = String(formData.get("registrationId") ?? "").trim();
-  const status = String(formData.get("status") ?? "").trim();
-  if (!registrationId || !allowedStatuses.has(status)) return new Response("Bad request", { status: 400 });
+  if (!registrationId) return new Response("Bad request", { status: 400 });
 
-  const approvedAt = status === "approved" ? new Date().toISOString() : null;
-  const result = await getD1().prepare(`
-    UPDATE registrations
-    SET status = ?, paid_at = ?
-    WHERE id = ?
-      AND deleted_at IS NULL
-      AND status IN ('receipt_submitted', 'approved', 'rejected')
-      AND EXISTS (SELECT 1 FROM payment_receipts WHERE payment_receipts.registration_id = registrations.id)
-  `).bind(status, approvedAt, registrationId).run();
+  const result = await getD1()
+    .prepare("UPDATE registrations SET deleted_at = ? WHERE id = ? AND deleted_at IS NULL")
+    .bind(new Date().toISOString(), registrationId)
+    .run();
 
-  if (!result.meta.changes) return new Response("Registration not found or cannot be reviewed", { status: 404 });
-  return Response.redirect(`${externalOrigin(request)}/admin?updated=${status}`, 303);
+  if (!result.meta.changes) return new Response("Registration not found", { status: 404 });
+  return Response.redirect(`${externalOrigin(request)}/admin?deleted=1`, 303);
 }

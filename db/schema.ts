@@ -19,6 +19,7 @@ export const registrations = sqliteTable("registrations", {
   paymentReference: text("payment_reference"),
   createdAt: text("created_at").notNull(),
   paidAt: text("paid_at"),
+  deletedAt: text("deleted_at"),
 }, (table) => [
   uniqueIndex("idx_registrations_identifier_code").on(table.identifierCode),
   index("idx_registrations_created_at").on(table.createdAt),

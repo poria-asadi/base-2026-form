@@ -10,5 +10,6 @@ declare namespace Cloudflare {
     PAYMENT_CARD_NUMBER?: string;
     PAYMENT_CARD_HOLDER?: string;
     PAYMENT_BANK_NAME?: string;
+    INTERNAL_API_KEY?: string;
   }
 }
